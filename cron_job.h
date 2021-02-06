@@ -91,7 +91,7 @@ extern void
 cron_expr_test(char *expr, int32_t nResultNum);
 
 /**
- * \brief   Remove cron job
+ * \brief   Add cron job
  * \param[in]   expr    cron expression, it needs to end with '\t'
  * \param[in]   pfn job callback function
  * \param[in]   pUser   the parameter passed to the callback function
@@ -101,7 +101,7 @@ extern int32_t
 cron_job_add(char *expr, cron_job_cb_fn *pfn, void *pUser);
 
 /**
- * \brief   Add cron job
+ * \brief   Remove cron job
  * \param[in]   nId job id
  * \return      -1 for error
  */
