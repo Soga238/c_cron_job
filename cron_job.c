@@ -451,7 +451,7 @@ void cron_job_run(void)
                 cur += 60;   /*! enter the next timing cycle */
 #endif
                 ptJob->tNext = next_time(&ptJob->tLine, cur, cur + SEC_LIMITS);
-                ptJob->pUser != NULL ? ptJob->pfnJob(ptJob->pUser) : 0;
+                ptJob->pfnJob != NULL ? ptJob->pfnJob(ptJob->pUser) : 0;
             }
         }
     }
