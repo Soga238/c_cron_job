@@ -359,16 +359,20 @@ int32_t cron_job_add(char *expr, cron_job_cb_fn *pfn, void *pUser)
  */
 int32_t cron_job_remove(int32_t nId)
 {
+    int32_t nRet = -1;
     cron_job_t *ptJob, *ptTmp;
 
     k_list_for_each_entry_safe(ptJob, ptTmp, &s_tJobHead, tLink) {
         if ((ptJob->nId == nId) || (CRON_JOB_ID_ALL == nId)) {
             k_list_del(&ptJob->tLink);
             JOB_FREE(ptJob);
-            return nId;
+            nRet = nId;
+            if (CRON_JOB_ID_ALL != nId) {
+                break;
+            }
         }
     }
-    return -1;
+    return nRet;
 }
 
 static int32_t match_line(CronLine *ptline, struct tm *tm)
