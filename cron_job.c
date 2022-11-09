@@ -18,8 +18,8 @@
 #include <stdlib.h>
 
 #include "k_list.h"
-#include "./cron_job_cfg.h"
-#include "./cron_job.h"
+#include "cron_job_cfg.h"
+#include "cron_job.h"
 
 /* Global variables ------------------------------------------------*/
 /* Private typedef -------------------------------------------------*/
@@ -70,6 +70,15 @@ typedef struct {
     #define TIME_R(__PTR)    time(__PTR)
 #endif
 
+#ifdef CUSTOM_MKTIME_IMPLEMENTATION
+#ifndef MKTIME
+    #error "Users need to implement mktime()"
+#endif
+#else
+    #undef  MKTIME
+    #define MKTIME(__PTR)    mktime(__PTR)
+#endif
+
 /* Private macro ---------------------------------------------------*/
 #undef  MEM_SERO
 #define MEM_ZERO(__PTR, __SIZE) memset((__PTR), 0, (__SIZE))
@@ -93,20 +102,77 @@ static const char *const MonAry[] = {
 /* Private function prototypes -------------------------------------*/
 /* Private functions -----------------------------------------------*/
 #if defined(_WIN32) || defined(WIN32) || defined(__WINDOWS__)
-#define LOCALTIME_S(__TM_P, __TIME_P)   localtime_s(__TM_P, __TIME_P)
+    #ifndef CUSTOM_LOCATIME_S_IMPLEMENTATION
+        #define LOCALTIME_S(__TM_P, __TIME_P)   localtime_s(__TM_P, __TIME_P)
+    #endif
 #elif defined(__linux__)
-#define LOCALTIME_S(__TM_P, __TIME_P)   localtime_r(__TIME_P, __TM_P)
+    #ifndef CUSTOM_LOCATIME_S_IMPLEMENTATION
+        #define LOCALTIME_S(__TM_P, __TIME_P)   localtime_r(__TIME_P, __TM_P)
+    #endif
 #else
-static int _localtime_s(struct tm *tm, time_t *time)
+static struct tm *_localtime_r(const time_t *srctime, struct tm *tm_time)
 {
-    struct tm *_tm;
-    // thread lock
-    _tm = localtime(time);
-    *tm = *_tm;
-    // thread unlock
-    return 0;
+    long int n32_Pass4year, n32_hpery;
+    const static char Days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    const static int ONE_YEAR_HOURS = 8760;
+
+    time_t time = *srctime;
+    time = time + 28800;
+    tm_time->tm_isdst = 0;
+    if (time < 0) {
+        time = 0;
+    }
+
+    tm_time->tm_sec = (int)(time % 60);
+    time /= 60;
+    tm_time->tm_min = (int)(time % 60);
+    time /= 60;
+    tm_time->tm_wday = (time / 24 + 4) % 7;
+    n32_Pass4year = ((unsigned int)time / (1461L * 24L));
+    tm_time->tm_year = (n32_Pass4year << 2) + 70;
+    time %= 1461L * 24L;
+    tm_time->tm_yday = (time / 24) % 365;
+
+    for (;;) {
+        n32_hpery = ONE_YEAR_HOURS;
+        if ((tm_time->tm_year & 3) == 0) {
+            n32_hpery += 24;
+        }
+
+        if (time < n32_hpery) {
+            break;
+        }
+
+        tm_time->tm_year++;
+        time -= n32_hpery;
+    }
+
+    tm_time->tm_hour = (int)(time % 24);
+    time /= 24;
+    time++;
+
+    if ((tm_time->tm_year & 3) == 0) {
+        if (time > 60) {
+            time--;
+        }
+        else {
+            if (time == 60)
+            {
+                tm_time->tm_mon = 1;
+                tm_time->tm_mday = 29;
+                return tm_time;
+            }
+        }
+    }
+
+    for (tm_time->tm_mon = 0; Days[tm_time->tm_mon] < time; tm_time->tm_mon++) {
+        time -= Days[tm_time->tm_mon];
+    }
+
+    tm_time->tm_mday = (int)(time);
+    return tm_time;
 }
-#define LOCALTIME_S(__TM_P, __TIME_P)   _localtime_s(__TM_P, __TIME_P)
+#define LOCALTIME_S(__TM_P, __TIME_P)   _localtime_r((__TM_P), (__TIME_P))
 #endif
 
 /*! reference from busybox/crond.c */
@@ -257,7 +323,7 @@ static time_t next_time(CronLine *ptline, time_t start, time_t end)
                 tm.tm_year++;
                 tm.tm_mon = 0;
             }
-            t = mktime(&tm);
+            t = MKTIME(&tm);
             continue;
         }
 
@@ -266,7 +332,7 @@ static time_t next_time(CronLine *ptline, time_t start, time_t end)
             0 == ptline->cl_Dow[tm.tm_wday]) {
             if (0 == add++) {
                 tm.tm_hour = tm.tm_min = tm.tm_sec = 0;
-                t = mktime(&tm);
+                t = MKTIME(&tm);
             }
             t += 86400; /*! 24 * 60 * 60 */
             continue;
@@ -276,7 +342,7 @@ static time_t next_time(CronLine *ptline, time_t start, time_t end)
         if (0 == ptline->cl_Hrs[tm.tm_hour]) {
             if (0 == add++) {
                 tm.tm_min = tm.tm_sec = 0;
-                t = mktime(&tm);
+                t = MKTIME(&tm);
             }
             t += 3600; /*! 60 * 60 */
             continue;
@@ -286,7 +352,7 @@ static time_t next_time(CronLine *ptline, time_t start, time_t end)
         if (0 == ptline->cl_Mins[tm.tm_min]) {
             if (0 == add++) {
                 tm.tm_sec = 0;
-                t = mktime(&tm);
+                t = MKTIME(&tm);
             }
             t += 60; /*! 60 */
             continue;
@@ -340,10 +406,10 @@ int32_t cron_job_add(char *expr, cron_job_cb_fn *pfn, void *pUser)
         return -1;
     }
 
-    cur = time(NULL);
+    cur = TIME_R(NULL);
     /*! Limit maximum search time depth */
     ptJob->tNext = next_time(&ptJob->tLine, cur, cur + SEC_LIMITS);
-    
+
     ptJob->pfnJob = pfn;
     ptJob->pUser = pUser;
     ptJob->nId = job_id();
@@ -409,7 +475,7 @@ void cron_job_run_as_notifier(cron_job_notifier_fn *pfnNotifier)
         return ;
     }
 
-    cur = time(NULL);
+    cur = TIME_R(NULL);
     LOCALTIME_S(&tm, &cur);
 
     k_list_for_each_entry_safe(ptJob, ptTmp, &s_tJobHead, tLink) {
@@ -443,7 +509,7 @@ void cron_job_run(void)
         return ;
     }
 
-    cur = time(NULL);
+    cur = TIME_R(NULL);
     LOCALTIME_S(&tm, &cur);
 
     k_list_for_each_entry_safe(ptJob, ptTmp, &s_tJobHead, tLink) {
@@ -525,7 +591,7 @@ void cron_expr_test(char *expr, int32_t nResultNum)
         return;
     }
 
-    cur = time(NULL);
+    cur = TIME_R(NULL);
 
     for (i = 0; i < nResultNum; i++) {
         next = next_time(&line, cur, cur + SEC_LIMITS);

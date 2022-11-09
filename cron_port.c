@@ -11,10 +11,9 @@
  * See the Mulan PSL v2 for more details.                                   *
  *                                                                          *
  ***************************************************************************/
-
 /* Includes --------------------------------------------------------*/
-#include <time.h>
-#include "./cron_job_cfg.h"
+#include <stddef.h>
+#include "cron_job_cfg.h"
 
 /* Global variables ------------------------------------------------*/
 /* Private typedef -------------------------------------------------*/
@@ -24,30 +23,28 @@
 /* Private function prototypes -------------------------------------*/
 /* Private functions -----------------------------------------------*/
 #ifdef CUSTOM_TIME_IMPLEMENTATION
-static unsigned long _mktime(unsigned int year0,    // 1970 -
-                             unsigned char mon0,    // 1 - 12
-                             unsigned char day,     // 1 - 31
-                             unsigned char hour,    // 0 - 23
-                             unsigned char min,     // 0 - 59
-                             unsigned char sec)     // 0 - 59
-{
-    unsigned int mon = mon0, year = year0;
-    unsigned long time;
-
-    /* 1..12 -> 11,12,1..10 */
-    if (0 >= (int) (mon -= 2)) {
-        mon += 12;    /* Puts Feb last since it has leap day */
-        year -= 1;
-    }
-
-    time = (year / 4 - year / 100 + year / 400 + 367 * mon / 12 + day);
-    time = (((time + year * 365 - 719499) * 24 + hour) * 60 + min) * 60 + sec;
-    return time;
-}
-
-time_t _time(time_t *time)
+time_t cron_time(time_t *time)
 {
     return 0;
+}
+#endif
+
+#ifdef CUSTOM_MKTIME_IMPLEMENTATION
+time_t cron_mktime(struct tm* const tm)
+{
+    return 0;
+}
+#endif
+
+#ifdef CUSTOM_JOB_MALLOC
+void *cron_malloc(size_t tSize)
+{
+    return 0;
+}
+
+void cron_free(void *p)
+{
+
 }
 #endif
 

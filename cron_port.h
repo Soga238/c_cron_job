@@ -11,24 +11,31 @@
  * See the Mulan PSL v2 for more details.                                   *
  *                                                                          *
  ***************************************************************************/
-#ifndef CRON_JOB_CFG_H
-#define CRON_JOB_CFG_H
+#ifndef CRON_PORT_H
+#define CRON_PORT_H
+
+/* Includes --------------------------------------------------------*/
+#include <time.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Includes --------------------------------------------------------*/
 /* Global define ---------------------------------------------------*/
-#define CRON_SUPPORT_SECOND
-
 /* Global macro ----------------------------------------------------*/
 /* Global typedef --------------------------------------------------*/
 /* Global variables ------------------------------------------------*/
 /* Global function prototypes --------------------------------------*/
+extern time_t cron_time(time_t *time);
+
+extern time_t cron_mktime(struct tm* const tm);
+
+extern void *cron_malloc(size_t tSize);
+
+extern void cron_free(void *p);
 
 #ifdef __cplusplus
 }
 #endif
-#endif
 
+#endif
 /*************************** End of file ****************************/
